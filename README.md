@@ -61,17 +61,45 @@ Every single subsystem and feature identified in `test.apk` was analyzed and ind
 - **Caught Preview**: Instant pre-evaluation of catch probability based on the Niantic catch formula, displaying real-time success probability before the 3-shake animation finishes.
 - **Inventory IV Badges**: Color-coded IV percentage badges (100% Gold, 82%+ Green, 67%+ Blue, Gray) on every Pokémon card in the collection box.
 
-### 4. Key Activation & Licensing
-- Testable, decoupled activation manager (`ActivationManager.kt`) utilizing local validation without external network dependencies.
-- Persistent state management across app launches via `SharedPreferences`.
-- Automatic normalization of delimiters (hyphens, spaces, underscores) and case-insensitivity.
-- Supported Local Dev Test Keys:
+### 4. Key Activation & Licensing (Pro Tier Gating)
+- **Offline On-Device Validator**: Testable, decoupled activation manager (`ActivationManager.kt`) utilizing local validation without external network dependencies.
+- **Delimiter Normalization**: Automatically handles hyphens, spaces, and underscores (e.g. `dev pro 2026` or `DEV_PRO_2026` -> `DEV-PRO-2026`).
+- **Persistent State**: License key, tier, and expiration timestamp persisted securely across app launches via `SharedPreferences`.
+- **Supported Test Keys**:
   - `DEV-PRO-2026`: 1-Year Pro access (365 days)
   - `TRIAL-7DAYS`: 7-Day Trial access
   - `LIFETIME-PRO`: Lifetime unlocked access
   - `PRO-XXXX-XXXX`: 30-Day Pro access
 
-### 5. Core Game Mechanics & Services
+#### Which Features Unlock Immediately After Key Activation?
+Entering an active key unlocks **10 Core Pro Features** that are restricted in Free Tier:
+
+| Pro Feature | Inactive (Free Tier) Behavior | Active (Pro Tier) Behavior |
+|---|---|---|
+| **Virtual Joystick** | Hidden; navigation restricted to Tap-to-Walk | Draggable on-screen thumbstick with directional velocity vectors |
+| **Speed-Up Controls** | Locked to standard Walk speed (9.3 km/h) | Real-time toolbar selector: Walk (9.3), Run (18.5), Cycle (30), Drive (60 km/h) |
+| **Double Tap to Teleport** | Double-tap falls back to Tap-to-Walk waypoint | Instant coordinate teleportation with softban distance cooldown timer |
+| **Enhanced Throw** | Throws depend on user gesture accuracy | Forced 100% EXCELLENT score (1.7x) + Curveball modifier (1.7x) |
+| **Encounter IV HUD** | Stats hidden until caught and appraised | Real-time overlay showing exact IV%, appraisal stars (0–4★), and ATK/DEF/STA |
+| **Caught Preview** | Hidden; standard 3-shake animation sequence | Instant pre-shake prediction banner ("CAUGHT" vs "BREAKOUT") |
+| **Auto-Catch Engine** | Locked; manual wild encounters only | Autonomous scanning and catching within 80m with ball fallback |
+| **Auto-Spin PokéStops** | Locked; manual disc-spinning only | Autonomous scanning and spinning of ready PokéStops within 40m |
+| **Auto-Feed Buddy** | Locked; manual feeding minigame | Automatically feeds berries (Razz, Nanab, Pinap) below 30% hunger |
+| **Inventory IV Badges** | Badges hidden on Box collection cards | Color-coded IV% badges (100% Gold, 82%+ Green, 67%+ Blue, Gray) |
+
+---
+
+### 5. Comprehensive 44-Feature Mod Audit
+An exhaustive 44-feature audit was conducted against the target mod ecosystem (`test.apk` / PGSharp):
+- **19 Implemented & Tested**: Core movement, spoofing, mechanics, Pokédex, background services, widgets, and all 10 key-activated Pro features.
+- **8 Partially Implemented**: Route walking, Quick catch animation skip, Auto-incubator prioritization, Gym combat assist, Auto-heal, Account profile carousel, Shortcuts, and Context panel.
+- **17 Missing / Planned**: Block Non-Shiny, Block Non-Hundo, Quick Sniper I & II feeds, Auto-Discard inventory items, Transfer on Catch with keep-selected rules, Gift/Quest assistants, Hide Trainer Name, Pokémon Name Generator, and PvP Rank Calculator.
+
+*See the complete **[44-Feature Matrix & Technical Audit](docs/feature_matrix.md)** for full component mappings and test coverage.*
+
+---
+
+### 6. Core Game Mechanics & Services
 - **Gen 1 Pokédex**: Complete 151 species catalog with base stats, typings, seen/caught counters, and evolution lines.
 - **Interactive Combat**: Gym arena battle simulator with Fast Attacks and Charged Moves.
 - **Egg Incubation**: 2km, 5km, 7km, 10km, and 12km eggs with standard (1.0x) and super (0.67x) incubators.
