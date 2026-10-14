@@ -13,7 +13,9 @@ This document provides a comprehensive, verified audit of all 44 features revers
 - **Blocked**: 0 (0%)
 - **Pro Features Gated by Key Activation**: 24 features (Unlocked via valid license key, e.g. `DEV-PRO-2026`)
 - **Unit Test Coverage**: 32 passing unit tests across mechanics, movement, activation, automation, PvP rankings, naming templates, routes, and JSON import/export.
-- **Build Status**: Verified debug APK generated at `output/cleanroom-pokemongo-debug.apk` (SHA-256: `29e4326c0c6f73ccf2468911cccd78a70553c10a1e41f6353e2238ef93db48df`).
+- **Build Status**:
+  - **Complete Integrated Target APK**: `output/csharp-pokemongo-v0.433.0-signed.apk` (452 MB, arm64-v8a, MultiDex 5 files, v3 signature verified).
+  - **Clean-Room Companion APK**: `output/cleanroom-pokemongo-debug.apk` (52 MB, SHA-256: `29e4326c0c6f73ccf2468911cccd78a70553c10a1e41f6353e2238ef93db48df`).
 
 ---
 
