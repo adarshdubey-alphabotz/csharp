@@ -24,10 +24,17 @@ data class PokemonInstance(
     val chargedMove: String = "Struggle",
     val currentHp: Int = 100,
     val isFavorite: Boolean = false,
+    val isShiny: Boolean = false,
     val caughtTimestamp: Long = System.currentTimeMillis(),
     val heightM: Float = 1.0f,
     val weightKg: Float = 10.0f
 ) {
+    val ivPercent: Float
+        get() = ((ivAttack + ivDefense + ivStamina) / 45.0f) * 100.0f
+
+    val isHundo: Boolean
+        get() = ivAttack == 15 && ivDefense == 15 && ivStamina == 15
+
     // CPM (CP Multiplier) based on official Niantic progression (level 1 to 40)
     fun getCpMultiplier(): Float {
         return when {

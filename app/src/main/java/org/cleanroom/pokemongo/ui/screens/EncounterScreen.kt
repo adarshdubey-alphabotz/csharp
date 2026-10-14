@@ -9,8 +9,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,10 +30,12 @@ import kotlinx.coroutines.launch
 import org.cleanroom.pokemongo.data.activation.ActivationManager
 import org.cleanroom.pokemongo.data.activation.ProFeature
 import org.cleanroom.pokemongo.data.automation.AutomationEngine
+import org.cleanroom.pokemongo.data.automation.EncounterFilterResult
 import org.cleanroom.pokemongo.data.models.ItemType
 import org.cleanroom.pokemongo.data.models.WildPokemonSpawn
 import org.cleanroom.pokemongo.data.repository.*
 import org.cleanroom.pokemongo.ui.theme.*
+
 
 @Composable
 fun EncounterScreen(
@@ -53,6 +56,8 @@ fun EncounterScreen(
     val isProActive = activationManager.isProActive()
     val isEncounterIvUnlocked = activationManager.isFeatureUnlocked(ProFeature.ENCOUNTER_IV) && automationConfig.encounterIvEnabled
     val ivDetails = remember(spawn) { automationEngine.calculateEncounterIv(spawn) }
+    val blockFilterResult = remember(spawn) { automationEngine.checkEncounterAllowed(spawn) }
+
 
     var selectedBall by remember { mutableStateOf(automationConfig.preferredBall.takeIf { (items[it] ?: 0) > 0 } ?: ItemType.POKE_BALL) }
     var activeBerry by remember { mutableStateOf<ItemType?>(null) }
@@ -103,7 +108,60 @@ fun EncounterScreen(
         }
     }
 
+    if (blockFilterResult is EncounterFilterResult.Blocked) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xEE0F172A)),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Blocked",
+                        tint = PokeballRed,
+                        modifier = Modifier.size(56.dp)
+                    )
+
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Encounter Blocked",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 20.sp,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = blockFilterResult.reason,
+                        color = TextMuted,
+                        fontSize = 13.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Button(
+                        onClick = onRunAway,
+                        colors = ButtonDefaults.buttonColors(containerColor = PokemonBlue),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Return to Map", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        return
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
+
         // 1. Encounter 3D Landscape Background Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
@@ -447,9 +505,14 @@ fun EncounterScreen(
                                 }
 
                                 // Check Enhanced Throw override
-                                val (quality, isCurve) = automationEngine.resolveThrow(baseQuality, true)
-                                val isEnhanced = quality == ThrowQuality.EXCELLENT && baseQuality != ThrowQuality.EXCELLENT
-                                encounterStatusText = if (isEnhanced) "EXCELLENT! (Enhanced)" else quality.displayName
+                                val (quality, isCurve, isArPlus) = automationEngine.resolveThrow(baseQuality, true)
+                                val isEnhanced = quality != baseQuality
+                                encounterStatusText = when {
+                                    isArPlus && isEnhanced -> "${quality.displayName}! (Enhanced AR+)"
+                                    isArPlus -> "${quality.displayName}! (AR+ Expert Handler)"
+                                    isEnhanced -> "${quality.displayName}! (Enhanced)"
+                                    else -> quality.displayName
+                                }
 
                                 // Caught Preview Prediction
                                 val isCaughtPreviewUnlocked = activationManager.isFeatureUnlocked(ProFeature.CAUGHT_PREVIEW) && automationConfig.caughtPreviewEnabled
@@ -468,54 +531,88 @@ fun EncounterScreen(
                                     }
                                 }
 
+                                val isQuickCatchActive = activationManager.isFeatureUnlocked(ProFeature.QUICK_CATCH) && automationConfig.quickCatchEnabled
+
                                 coroutineScope.launch {
-                                    delay(600)
-                                    isThrowing = false
-                                    isShakingBall = true
-                                    encounterStatusText = null
-
-                                    // Simulate 3 shakes
-                                    delay(900)
-                                    shakeCount = 1
-                                    delay(900)
-                                    shakeCount = 2
-                                    delay(900)
-                                    shakeCount = 3
-
-                                    val catchResult = repo.catchPokemon(
-                                        spawn = spawn,
-                                        ballType = selectedBall,
-                                        berry = activeBerry,
-                                        throwQuality = quality,
-                                        isCurveball = isCurve
-                                    )
-
-                                    caughtPreviewBanner = null
-
-                                    when (catchResult) {
-                                        is CatchResult.Success -> {
-                                            isShakingBall = false
-                                            catchSuccessResult = catchResult
+                                    if (isQuickCatchActive) {
+                                        delay(350)
+                                        isThrowing = false
+                                        val catchResult = repo.catchPokemon(
+                                            spawn = spawn,
+                                            ballType = selectedBall,
+                                            berry = activeBerry,
+                                            throwQuality = quality,
+                                            isCurveball = isCurve,
+                                            isArPlus = isArPlus
+                                        )
+                                        caughtPreviewBanner = null
+                                        when (catchResult) {
+                                            is CatchResult.Success -> {
+                                                automationEngine.evaluateTransferOnCatch(catchResult.pokemon)
+                                                onCatchComplete()
+                                            }
+                                            is CatchResult.Breakout -> {
+                                                encounterStatusText = "Break out! (Quick Catch)"
+                                                delay(500)
+                                                encounterStatusText = null
+                                                activeBerry = null
+                                            }
+                                            is CatchResult.Fled -> {
+                                                onRunAway()
+                                            }
                                         }
-                                        is CatchResult.Breakout -> {
-                                            isShakingBall = false
-                                            encounterStatusText = "Break out!"
-                                            delay(1000)
-                                            encounterStatusText = null
-                                            activeBerry = null // Berry consumed on breakout
-                                        }
-                                        is CatchResult.Fled -> {
-                                            isShakingBall = false
-                                            hasFled = true
-                                            encounterStatusText = "${species.name} fled!"
-                                            delay(1500)
-                                            onRunAway()
+                                    } else {
+                                        delay(600)
+                                        isThrowing = false
+                                        isShakingBall = true
+                                        encounterStatusText = null
+
+                                        // Simulate 3 shakes
+                                        delay(900)
+                                        shakeCount = 1
+                                        delay(900)
+                                        shakeCount = 2
+                                        delay(900)
+                                        shakeCount = 3
+
+                                        val catchResult = repo.catchPokemon(
+                                            spawn = spawn,
+                                            ballType = selectedBall,
+                                            berry = activeBerry,
+                                            throwQuality = quality,
+                                            isCurveball = isCurve,
+                                            isArPlus = isArPlus
+                                        )
+
+                                        caughtPreviewBanner = null
+
+                                        when (catchResult) {
+                                            is CatchResult.Success -> {
+                                                automationEngine.evaluateTransferOnCatch(catchResult.pokemon)
+                                                isShakingBall = false
+                                                catchSuccessResult = catchResult
+                                            }
+                                            is CatchResult.Breakout -> {
+                                                isShakingBall = false
+                                                encounterStatusText = "Break out!"
+                                                delay(1000)
+                                                encounterStatusText = null
+                                                activeBerry = null // Berry consumed on breakout
+                                            }
+                                            is CatchResult.Fled -> {
+                                                isShakingBall = false
+                                                hasFled = true
+                                                encounterStatusText = "${species.name} fled!"
+                                                delay(1500)
+                                                onRunAway()
+                                            }
                                         }
                                     }
                                 }
                             }
                         )
                     },
+
                 contentAlignment = Alignment.Center
             ) {
                 Text(

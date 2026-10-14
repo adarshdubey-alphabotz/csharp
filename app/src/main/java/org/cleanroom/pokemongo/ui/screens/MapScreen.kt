@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,10 +33,12 @@ import org.cleanroom.pokemongo.data.activation.ActivationManager
 import org.cleanroom.pokemongo.data.activation.ProFeature
 import org.cleanroom.pokemongo.data.automation.AutomationEngine
 import org.cleanroom.pokemongo.data.models.*
-import org.cleanroom.pokemongo.data.movement.MovementController
-import org.cleanroom.pokemongo.data.movement.MovementSpeed
+import org.cleanroom.pokemongo.data.movement.*
 import org.cleanroom.pokemongo.data.repository.GameStateRepository
 import org.cleanroom.pokemongo.data.repository.PokedexDatabase
+import org.cleanroom.pokemongo.data.sniper.SniperFeedType
+import org.cleanroom.pokemongo.data.sniper.SniperManager
+import org.cleanroom.pokemongo.data.sniper.SniperTarget
 import org.cleanroom.pokemongo.ui.theme.*
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -53,6 +57,8 @@ fun MapScreen(
     val activationManager = remember { ActivationManager.getInstance(context) }
     val movementController = remember { MovementController.getInstance(repo) }
     val automationEngine = remember { AutomationEngine.getInstance(context, repo, activationManager) }
+    val sniperManager = remember { SniperManager(activationManager) }
+    val routeManager = remember { RouteManager(movementController, activationManager) }
 
     val playerLat by repo.playerLatitude.collectAsState()
     val playerLon by repo.playerLongitude.collectAsState()
@@ -67,8 +73,16 @@ fun MapScreen(
     val isWalkingToWaypoint by movementController.isWalking.collectAsState()
     val tapWaypoint by movementController.tapToWalkDestination.collectAsState()
     val automationConfig by automationEngine.config.collectAsState()
+    val patrolState by routeManager.patrolState.collectAsState()
 
     val isProActive = activationManager.isProActive()
+
+    // Dialog & overlay states
+    var showSniperModal by remember { mutableStateOf(false) }
+    var showRouteModal by remember { mutableStateOf(false) }
+    var showContextDrawer by remember { mutableStateOf(false) }
+    var sniperFeedTab by remember { mutableStateOf(SniperFeedType.HUNDO_100IV) }
+    var isAppOverlayHidden by remember { mutableStateOf(false) }
 
     // Pulse animation for player detection circle
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -96,6 +110,13 @@ fun MapScreen(
         while (isWalkingToWaypoint) {
             delay(100)
             movementController.stepTowardsDestination(0.1f)
+        }
+    }
+
+    // Route waypoint patrol advance check
+    LaunchedEffect(patrolState.isRunning, playerLat, playerLon) {
+        if (patrolState.isRunning) {
+            routeManager.checkAndAdvanceWaypoint(playerLat, playerLon)
         }
     }
 
@@ -145,6 +166,11 @@ fun MapScreen(
                             } else {
                                 movementController.setTapToWalkDestination(targetLat, targetLon)
                             }
+                        },
+                        onLongPress = {
+                            if (automationConfig.hideAppWithGestureEnabled) {
+                                isAppOverlayHidden = !isAppOverlayHidden
+                            }
                         }
                     )
                 }
@@ -160,239 +186,297 @@ fun MapScreen(
             )
             drawLine(
                 color = RoadGray.copy(alpha = 0.45f),
-                start = Offset(size.width * 0.25f, 0f),
-                end = Offset(size.width * 0.75f, size.height),
-                strokeWidth = 26f
+                start = Offset(size.width * 0.2f, 0f),
+                end = Offset(size.width * 0.8f, size.height),
+                strokeWidth = 24f
             )
 
-            // Draw water pond feature
+            // Water feature
             drawCircle(
                 color = WaterBlue.copy(alpha = 0.7f),
-                center = Offset(size.width * 0.85f, size.height * 0.25f),
-                radius = 120f
+                center = Offset(size.width * 0.82f, size.height * 0.22f),
+                radius = 70f
             )
 
-            // Draw Tap-to-walk Waypoint Destination Marker if set
-            tapWaypoint?.let { wp ->
-                val wpScreenX = center.x + ((wp.second - playerLon) * 500000.0).toFloat()
-                val wpScreenY = center.y - ((wp.first - playerLat) * 500000.0).toFloat()
-                drawCircle(
-                    color = PokemonYellow.copy(alpha = 0.85f),
-                    center = Offset(wpScreenX, wpScreenY),
-                    radius = 16f
-                )
-                drawLine(
-                    color = PokemonYellow.copy(alpha = 0.5f),
-                    start = center,
-                    end = Offset(wpScreenX, wpScreenY),
-                    strokeWidth = 3f
-                )
-            }
-
-            // Draw player radar pulse circle
+            // Radar pulse ring
             drawCircle(
                 color = AccentCyan.copy(alpha = pulseAlpha),
                 center = center,
                 radius = pulseRadius,
                 style = Stroke(width = 3f)
             )
+
+            // Interaction radius ring (40m)
             drawCircle(
-                color = AccentCyan.copy(alpha = 0.15f),
+                color = Color.White.copy(alpha = 0.15f),
                 center = center,
-                radius = 80f
+                radius = 80f,
+                style = Stroke(width = 2f)
             )
 
-            // Draw Player Marker
+            // Tap-to-Walk trajectory line and destination pin
+            tapWaypoint?.let { wp ->
+                val dx = ((wp.second - playerLon) / 0.0010 * size.width).toFloat()
+                val dy = -((wp.first - playerLat) / 0.0010 * size.height).toFloat()
+                val wpOffset = Offset(center.x + dx, center.y + dy)
+
+                // Trajectory line
+                drawLine(
+                    color = PokemonYellow.copy(alpha = 0.7f),
+                    start = center,
+                    end = wpOffset,
+                    strokeWidth = 4f
+                )
+
+                // Destination Marker Pin
+                drawCircle(
+                    color = PokemonYellow,
+                    center = wpOffset,
+                    radius = 12f
+                )
+                drawCircle(
+                    color = PokeballRed,
+                    center = wpOffset,
+                    radius = 6f
+                )
+            }
+
+            // Player Avatar Circle
             drawCircle(
                 color = Color.White,
                 center = center,
-                radius = 12f
+                radius = 16f
             )
             drawCircle(
                 color = PokemonBlue,
                 center = center,
-                radius = 9f
+                radius = 12f
             )
         }
 
-        // 2. PokéStops Overlays
+        // 2. PokéStop Markers Overlay
         pokestops.forEach { stop ->
-            val screenX = ((stop.longitude - playerLon) * 500000.0).toFloat()
-            val screenY = -((stop.latitude - playerLat) * 500000.0).toFloat()
+            val dx = ((stop.longitude - playerLon) / 0.0010 * 380).toFloat()
+            val dy = -((stop.latitude - playerLat) / 0.0010 * 380).toFloat()
 
             Box(
                 modifier = Modifier
-                    .offset(x = (200 + screenX).dp, y = (320 + screenY).dp)
-                    .size(54.dp)
+                    .align(Alignment.Center)
+                    .offset { IntOffset(dx.roundToInt(), dy.roundToInt()) }
+                    .size(44.dp)
                     .clip(CircleShape)
                     .background(if (stop.isInCooldown()) Color(0xFF9333EA) else PokemonBlue)
                     .clickable { onOpenPokestop(stop) },
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.Place,
-                        contentDescription = stop.name,
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        text = stop.name.take(6),
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Place,
+                    contentDescription = stop.name,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
 
-        // 3. Gym Overlays
+        // 3. Gym Towers Overlay
         gyms.forEach { gym ->
-            val screenX = ((gym.longitude - playerLon) * 500000.0).toFloat()
-            val screenY = -((gym.latitude - playerLat) * 500000.0).toFloat()
+            val dx = ((gym.longitude - playerLon) / 0.0010 * 380).toFloat()
+            val dy = -((gym.latitude - playerLat) / 0.0010 * 380).toFloat()
+
+            val gymColor = when (gym.team) {
+                Team.MYSTIC -> MysticBlue
+                Team.VALOR -> ValorRed
+                Team.INSTINCT -> InstinctYellow
+                else -> Color.Gray
+            }
 
             Box(
                 modifier = Modifier
-                    .offset(x = (120 + screenX).dp, y = (220 + screenY).dp)
-                    .size(68.dp)
+                    .align(Alignment.Center)
+                    .offset { IntOffset(dx.roundToInt(), dy.roundToInt()) }
+                    .size(54.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        when (gym.team) {
-                            Team.MYSTIC -> MysticBlue
-                            Team.VALOR -> ValorRed
-                            Team.INSTINCT -> InstinctYellow
-                            Team.NONE -> Color.Gray
-                        }
-                    )
+                    .background(gymColor)
                     .clickable { onOpenGym(gym) },
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.Shield,
-                        contentDescription = gym.name,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Text(
-                        text = "${gym.defenderCp} CP",
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = gym.name,
+                    tint = Color.White,
+                    modifier = Modifier.size(30.dp)
+                )
             }
         }
 
-        // 4. Wild Pokémon Spawns Overlays
+        // 4. Wild Pokémon Spawns Overlay
         wildSpawns.forEach { spawn ->
+            val dx = ((spawn.longitude - playerLon) / 0.0010 * 380).toFloat()
+            val dy = -((spawn.latitude - playerLat) / 0.0010 * 380).toFloat()
             val species = PokedexDatabase.getById(spawn.speciesId)
-            val screenX = ((spawn.longitude - playerLon) * 500000.0).toFloat()
-            val screenY = -((spawn.latitude - playerLat) * 500000.0).toFloat()
 
             Box(
                 modifier = Modifier
-                    .offset(x = (180 + screenX).dp, y = (290 + screenY).dp)
-                    .size(50.dp)
+                    .align(Alignment.Center)
+                    .offset { IntOffset(dx.roundToInt(), dy.roundToInt()) }
+                    .size(44.dp)
                     .clip(CircleShape)
-                    .background(Color(species?.primaryType?.hexColor ?: 0xFF3B82F6).copy(alpha = 0.9f))
+                    .background(
+                        Brush.radialGradient(
+                            listOf(
+                                if (spawn.isShiny) Color(0xFFFACC15) else Color(species?.primaryType?.hexColor ?: 0xFFF59E0B),
+                                Color(0xFF0F172A)
+                            )
+                        )
+                    )
                     .clickable { onEncounterPokemon(spawn) },
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = species?.name ?: "Pokémon",
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Lv.${spawn.level.toInt()}",
-                        color = PokemonYellow,
-                        fontSize = 9.sp
-                    )
-                }
+                Icon(
+                    imageVector = if (spawn.isShiny) Icons.Default.AutoAwesome else Icons.Default.CatchingPokemon,
+                    contentDescription = species?.name ?: "Spawn",
+                    tint = if (spawn.isShiny) PokemonYellow else Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
 
-        // 5. Top Bar: Header, Pro Badge, Refresh, and Cooldown Banner
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 40.dp, start = 16.dp, end = 16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        // Stealth unhide button when overlay is hidden
+        if (isAppOverlayHidden) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 40.dp, end = 16.dp)
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable { isAppOverlayHidden = false },
+                contentAlignment = Alignment.Center
             ) {
-                // Pro Badge & Status
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(SurfaceDark.copy(alpha = 0.85f))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(if (isProActive) Color(0xFF10B981) else Color(0xFF64748B))
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isProActive) "PRO ACTIVATED" else "FREE",
-                        color = if (isProActive) AccentCyan else TextMuted,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                // Top Controls: Directional Arrows & Refresh Spawns
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(SurfaceDark.copy(alpha = 0.85f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { movementController.applyJoystickVector(0f, 1f, 0.2f) },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(Icons.Default.ArrowUpward, "North", tint = Color.White, modifier = Modifier.size(18.dp))
-                    }
-                    IconButton(
-                        onClick = { movementController.applyJoystickVector(0f, -1f, 0.2f) },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(Icons.Default.ArrowDownward, "South", tint = Color.White, modifier = Modifier.size(18.dp))
-                    }
-                    IconButton(
-                        onClick = { movementController.applyJoystickVector(-1f, 0f, 0.2f) },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(Icons.Default.ArrowBack, "West", tint = Color.White, modifier = Modifier.size(18.dp))
-                    }
-                    IconButton(
-                        onClick = { movementController.applyJoystickVector(1f, 0f, 0.2f) },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(Icons.Default.ArrowForward, "East", tint = Color.White, modifier = Modifier.size(18.dp))
-                    }
-                    IconButton(
-                        onClick = { repo.refreshWildSpawns() },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(Icons.Default.Refresh, "Refresh Spawns", tint = AccentCyan, modifier = Modifier.size(18.dp))
-                    }
-                }
+                Icon(
+                    imageVector = Icons.Default.Visibility,
+                    contentDescription = "Unhide UI",
+                    tint = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.size(22.dp)
+                )
             }
+        }
 
-            // Speed Selector Toolbar
-            if (isProActive && automationConfig.speedControlsEnabled) {
-                Spacer(modifier = Modifier.height(8.dp))
+        if (!isAppOverlayHidden) {
+            // 5. Top Controls Header & Toolbar
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 40.dp, start = 14.dp, end = 14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Pro Badge & Status
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(SurfaceDark.copy(alpha = 0.85f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(if (isProActive) Color(0xFF10B981) else Color(0xFF64748B))
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isProActive) "PRO ACTIVATED" else "FREE",
+                            color = if (isProActive) AccentCyan else TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Dynamic Custom Shortcuts Toolbar
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(SurfaceDark.copy(alpha = 0.85f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        for (shortcut in automationConfig.customShortcuts) {
+                            when (shortcut.uppercase()) {
+                                "SNIPER" -> {
+                                    IconButton(
+                                        onClick = { showSniperModal = true },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.MyLocation, "Sniper", tint = if (isProActive) PokemonYellow else TextMuted, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                                "ROUTES" -> {
+                                    IconButton(
+                                        onClick = { showRouteModal = true },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.AltRoute, "Routes", tint = if (isProActive) AccentCyan else TextMuted, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                                "TOOLS" -> {
+                                    IconButton(
+                                        onClick = { showContextDrawer = true },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.Tune, "Tools", tint = Color.White, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                                "HEAL" -> {
+                                    IconButton(
+                                        onClick = { repo.healAllPokemon() },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.Healing, "Heal All", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                                "SPAWNS" -> {
+                                    IconButton(
+                                        onClick = {
+                                            val mult = if (isProActive) automationConfig.spawnBoosterMultiplier else 1
+                                            repo.refreshWildSpawns(mult)
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.Refresh, "Refresh Spawns", tint = AccentCyan, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                                "RESET" -> {
+                                    IconButton(
+                                        onClick = {
+                                            movementController.resetMovementAndUi()
+                                            repo.resetUiState()
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.RestartAlt, "Reset UI", tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                                "STEALTH" -> {
+                                    IconButton(
+                                        onClick = { isAppOverlayHidden = true },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.VisibilityOff, "Stealth Mode", tint = Color.White, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Speed Selector Toolbar
+                if (isProActive && automationConfig.speedControlsEnabled) {
+                    Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -417,6 +501,44 @@ fun MapScreen(
                                 fontSize = 11.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
+                        }
+                    }
+                }
+            }
+
+            // Route Patrol Active Banner
+            if (patrolState.isRunning && patrolState.activeRoute != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0284C7).copy(alpha = 0.9f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "Route Patrol: ${patrolState.activeRoute?.name}",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Waypoint ${patrolState.currentWaypointIndex + 1} / ${patrolState.activeRoute?.waypoints?.size ?: 0} (${patrolState.activeRoute?.mode?.displayName})",
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 10.sp
+                            )
+                        }
+                        Row {
+                            IconButton(onClick = { routeManager.pauseRoute() }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Pause, contentDescription = "Pause", tint = Color.White, modifier = Modifier.size(16.dp))
+                            }
+                            IconButton(onClick = { routeManager.stopRoute() }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Close, contentDescription = "Stop", tint = Color.White, modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                 }
@@ -521,16 +643,12 @@ fun MapScreen(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 24.dp)
         ) {
-            // Main Pokéball Menu Button
+            // Main Poké Ball Menu Button
             Box(
                 modifier = Modifier
-                    .size(68.dp)
+                    .size(64.dp)
                     .clip(CircleShape)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(PokeballRed, PokeballDarkRed, Color.White, Color.White)
-                        )
-                    )
+                    .background(PokeballRed)
                     .clickable { onOpenMenu() },
                 contentAlignment = Alignment.Center
             ) {
@@ -539,38 +657,23 @@ fun MapScreen(
                         .size(24.dp)
                         .clip(CircleShape)
                         .background(Color.White)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .align(Alignment.Center)
-                            .clip(CircleShape)
-                            .background(Color(0xFF1E293B))
-                    )
-                }
+                )
             }
         }
 
-        // Bottom Left: Trainer Avatar & Buddy Icon
+        // Bottom Left: Trainer Profile & Buddy
         Row(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = 16.dp, bottom = 24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Trainer Level Icon
+            // Trainer avatar
             Box(
                 modifier = Modifier
-                    .size(54.dp)
+                    .size(52.dp)
                     .clip(CircleShape)
-                    .background(trainer.team.let {
-                        when (it) {
-                            Team.MYSTIC -> MysticBlue
-                            Team.VALOR -> ValorRed
-                            Team.INSTINCT -> InstinctYellow
-                            else -> PokemonBlue
-                        }
-                    })
+                    .background(PokemonBlue)
                     .clickable { onOpenProfile() },
                 contentAlignment = Alignment.Center
             ) {
@@ -582,7 +685,7 @@ fun MapScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = trainer.name,
+                        text = if (automationConfig.hideTrainerName) "Trainer" else trainer.name,
                         color = Color.White.copy(alpha = 0.8f),
                         fontSize = 9.sp
                     )
@@ -635,6 +738,264 @@ fun MapScreen(
                     )
                 }
             }
+        }
+    }
+
+        // 8. Quick Sniper I & II Modal Dialog
+        if (showSniperModal) {
+            AlertDialog(
+                onDismissRequest = { showSniperModal = false },
+                title = {
+                    Text("Quick Sniper Feed", fontWeight = FontWeight.Bold, color = Color.White)
+                },
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth().height(360.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = sniperFeedTab == SniperFeedType.HUNDO_100IV,
+                                onClick = { sniperFeedTab = SniperFeedType.HUNDO_100IV },
+                                label = { Text("Sniper I (100% IV)", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = sniperFeedTab == SniperFeedType.TOP_PVP_RANKS,
+                                onClick = { sniperFeedTab = SniperFeedType.TOP_PVP_RANKS },
+                                label = { Text("Sniper II (PvP)", fontSize = 11.sp) }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        val targets = if (sniperFeedTab == SniperFeedType.HUNDO_100IV) {
+                            sniperManager.getHundoFeed(playerLat, playerLon, automationConfig.pokemonFeedLanguage)
+                        } else {
+                            sniperManager.getPvpFeed(playerLat, playerLon, automationConfig.pokemonFeedLanguage)
+                        }
+
+                        if (targets.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("Sniper requires active Pro Key license.", color = TextMuted, fontSize = 12.sp)
+                            }
+                        } else {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(targets) { target ->
+                                    Card(
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(10.dp).fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(target.speciesName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                                Text("CP ${target.cp} | ${target.cityName}", color = AccentCyan, fontSize = 11.sp)
+                                                Text("IV: ${target.ivAttack}/${target.ivDefense}/${target.ivStamina} (${target.ivPercent.toInt()}%)", color = PokemonYellow, fontSize = 10.sp)
+                                            }
+                                            Button(
+                                                onClick = {
+                                                    sniperManager.teleportToTarget(target, movementController)
+                                                    showSniperModal = false
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = PokemonBlue),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text("Teleport", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showSniperModal = false }) {
+                        Text("Close", color = TextMuted)
+                    }
+                },
+                containerColor = SurfaceDark
+            )
+        }
+
+        // 9. Routes & GPX Walk Modal Dialog
+        if (showRouteModal) {
+            AlertDialog(
+                onDismissRequest = { showRouteModal = false },
+                title = {
+                    Text("Auto-Walk GPX Routes", fontWeight = FontWeight.Bold, color = Color.White)
+                },
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth().height(320.dp)) {
+                        Text("Select a pre-configured patrol loop or GPX route:", color = TextMuted, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(routeManager.defaultRoutes) { route ->
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp).fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(route.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                            Text("${route.waypoints.size} Waypoints | ${route.mode.displayName}", color = TextMuted, fontSize = 11.sp)
+                                        }
+                                        Button(
+                                            onClick = {
+                                                routeManager.startRoute(route)
+                                                showRouteModal = false
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = GrassGreen),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text("Start", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showRouteModal = false }) {
+                        Text("Close", color = TextMuted)
+                    }
+                },
+                containerColor = SurfaceDark
+            )
+        }
+
+        // 10. Quick Context Menu Drawer
+        if (showContextDrawer) {
+            AlertDialog(
+                onDismissRequest = { showContextDrawer = false },
+                title = {
+                    Text("Companion Quick Tools", fontWeight = FontWeight.Bold, color = Color.White)
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                repo.healAllPokemon()
+                                showContextDrawer = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Healing, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Heal & Revive All Pokémon", fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                automationEngine.performAutoDiscard()
+                                showContextDrawer = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = PokeballRed),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Auto-Discard Surplus Items", fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                automationEngine.performAutoIncubation()
+                                showContextDrawer = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Egg, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Auto-Assign Egg Incubators", fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                automationEngine.performGiftAssistant()
+                                showContextDrawer = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = PokemonBlue),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.CardGiftcard, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Gift Assistant (Open/Send 10)", fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                automationEngine.performQuestAssistant()
+                                showContextDrawer = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Quest Assistant (Auto-Snapshots)", fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                isAppOverlayHidden = true
+                                showContextDrawer = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF475569)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.VisibilityOff, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Stealth Mode (Hide All Overlays)", fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                movementController.resetMovementAndUi()
+                                repo.resetUiState()
+                                showContextDrawer = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Reset UI (Position & Waypoints)", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showContextDrawer = false }) {
+                        Text("Close", color = TextMuted)
+                    }
+                },
+                containerColor = SurfaceDark
+            )
         }
     }
 }

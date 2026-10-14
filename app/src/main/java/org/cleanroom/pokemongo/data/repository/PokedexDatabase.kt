@@ -414,6 +414,43 @@ object PokedexDatabase {
 
     fun getById(id: Int): PokemonSpecies? = speciesMap[id]
 
+    private val japaneseNames = mapOf(
+        1 to "フシギダネ (Fushigidane)", 2 to "フシギソウ (Fushigisou)", 3 to "フシギバナ (Fushigibana)",
+        4 to "ヒトカゲ (Hitokage)", 5 to "リザード (Lizardo)", 6 to "リザードン (Lizardon)",
+        7 to "ゼニガメ (Zenigame)", 8 to "カメール (Kameil)", 9 to "カメックス (Kamex)",
+        25 to "ピカチュウ (Pikachu)", 26 to "ライチュウ (Raichu)", 68 to "カイリキー (Kairiky)",
+        94 to "ゲンガー (Gangar)", 130 to "ギャラドス (Gyarados)", 131 to "ラプラス (Laplace)",
+        143 to "カビゴン (Kabigon)", 149 to "カイリュー (Kairyu)", 150 to "ミュウツー (Mewtwo)"
+    )
+
+    private val germanNames = mapOf(
+        1 to "Bisasam", 2 to "Bisaknosp", 3 to "Bisaflor",
+        4 to "Glumanda", 5 to "Glutexo", 6 to "Glurak",
+        7 to "Schiggy", 8 to "Schillok", 9 to "Turtok",
+        25 to "Pikachu", 68 to "Machomei", 94 to "Gengar",
+        130 to "Garados", 131 to "Lapras", 143 to "Relaxo",
+        149 to "Dragoran", 150 to "Mewtu"
+    )
+
+    private val frenchNames = mapOf(
+        1 to "Bulbizarre", 2 to "Herbizarre", 3 to "Florizarre",
+        4 to "Salamèche", 5 to "Reptincel", 6 to "Dracaufeu",
+        7 to "Carapuce", 8 to "Carabaffe", 9 to "Tortank",
+        25 to "Pikachu", 68 to "Mackogneur", 94 to "Ectoplasma",
+        130 to "Léviator", 131 to "Lokhlass", 143 to "Ronflex",
+        149 to "Dracolosse", 150 to "Mewtwo"
+    )
+
+    fun getLocalizedName(speciesId: Int, language: String): String {
+        val baseName = getById(speciesId)?.name ?: "Pokémon"
+        return when (language.lowercase()) {
+            "japanese", "日本語", "original (japanese)" -> japaneseNames[speciesId] ?: baseName
+            "german", "deutsch", "german names" -> germanNames[speciesId] ?: baseName
+            "french", "français", "french names" -> frenchNames[speciesId] ?: baseName
+            else -> baseName
+        }
+    }
+
     fun getRandomSpawnSpecies(): PokemonSpecies {
         // Weighted selection favoring common species (Pidgey, Magikarp, Rattata, Bulbasaur, etc.)
         val pool = listOf(

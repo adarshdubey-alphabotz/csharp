@@ -72,17 +72,60 @@ fun BagScreen(
                 )
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        val healed = repo.healAllPokemon()
+                        statusMessage = if (healed > 0) "Restored $healed HP/revives across your Pokémon!" else "All Pokémon are already at 100% HP!"
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    Text("Heal All (Potions)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val activationManager = remember { org.cleanroom.pokemongo.data.activation.ActivationManager.getInstance(context) }
+                val automationEngine = remember { org.cleanroom.pokemongo.data.automation.AutomationEngine.getInstance(context, repo, activationManager) }
+
+                Button(
+                    onClick = {
+                        val report = automationEngine.performAutoDiscard()
+                        statusMessage = if (report.totalDiscarded > 0) {
+                            "Auto-Discarded ${report.totalDiscarded} excess items!"
+                        } else {
+                            "Inventory is within limits (no items discarded)"
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PokeballRed),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    Text("Auto-Discard", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
             if (statusMessage != null) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = statusMessage ?: "",
                     color = PokemonYellow,
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 8.dp)
+                    fontWeight = FontWeight.Bold
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
 
             // Items List
             LazyColumn(

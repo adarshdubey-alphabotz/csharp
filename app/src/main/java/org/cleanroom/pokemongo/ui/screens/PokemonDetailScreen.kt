@@ -24,9 +24,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.cleanroom.pokemongo.data.models.PokemonInstance
+import org.cleanroom.pokemongo.data.naming.PokemonNameGenerator
+import org.cleanroom.pokemongo.data.pvp.PvpLeague
+import org.cleanroom.pokemongo.data.pvp.PvpRankCalculator
 import org.cleanroom.pokemongo.data.repository.GameStateRepository
 import org.cleanroom.pokemongo.data.repository.PokedexDatabase
 import org.cleanroom.pokemongo.ui.theme.*
+
 
 @Composable
 fun PokemonDetailScreen(
@@ -336,7 +340,86 @@ fun PokemonDetailScreen(
                 }
             }
 
+            // PvP Rank & Pro Rename Card
+            val glRank = remember(pokemon) {
+                PvpRankCalculator.calculatePvpRank(pokemon.speciesId, pokemon.ivAttack, pokemon.ivDefense, pokemon.ivStamina, PvpLeague.GREAT_LEAGUE)
+            }
+            val ulRank = remember(pokemon) {
+                PvpRankCalculator.calculatePvpRank(pokemon.speciesId, pokemon.ivAttack, pokemon.ivDefense, pokemon.ivStamina, PvpLeague.ULTRA_LEAGUE)
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "PvP League Ranks",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Great League: Rank #${glRank.rank} (CP ${glRank.cpAtLevel})",
+                            color = AccentCyan,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${String.format("%.1f%%", glRank.statProductPercent)}",
+                            color = PokemonYellow,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Ultra League: Rank #${ulRank.rank} (CP ${ulRank.cpAtLevel})",
+                            color = Color(0xFFA855F7),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${String.format("%.1f%%", ulRank.statProductPercent)}",
+                            color = PokemonYellow,
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {
+                            val newName = PokemonNameGenerator.generateName(pokemon)
+                            repo.renamePokemon(pokemon.id, newName)
+                            actionMessage = "Renamed to '$newName'!"
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = PokemonBlue),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Pro Auto-Rename (IV & Stats)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
             if (actionMessage != null) {
+
                 Text(
                     text = actionMessage ?: "",
                     color = PokemonYellow,

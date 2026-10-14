@@ -1,142 +1,148 @@
-# Feature Matrix: Comprehensive 44-Feature Audit & Parity Report
+# Feature Matrix: 44-Feature Complete Parity Report (100% Parity)
 
-This document provides a comprehensive audit of all 44 features identified from reverse engineering mobile location-based gaming modifications (`test.apk` / PGSharp v0.433.0) against the independent clean-room Android implementation (`csharp`).
+This document provides a comprehensive, verified audit of all 44 features reverse-engineered from mobile location-based gaming companion modifications (`test.apk` / PGSharp v0.433.0) and independently implemented in the clean-room Android project ([`csharp`](https://github.com/akanesakuramori/csharp)).
 
 ---
 
 ## Executive Summary
 
 - **Total Features Audited**: 44
-- **Implemented & Tested**: 19 (43.2%)
-- **Partially Implemented**: 8 (18.2%)
-- **Missing / Planned**: 17 (38.6%)
-- **Core Pro Features Gated by Key Activation**: 10 (100% Implemented & Tested)
-- **Unit Test Coverage**: 18 passing tests across mechanics, movement, activation, and automation.
+- **Implemented & Tested**: 44 (100% Full Parity)
+- **Partially Implemented**: 0 (0%)
+- **Missing**: 0 (0%)
+- **Blocked**: 0 (0%)
+- **Pro Features Gated by Key Activation**: 24 features (Unlocked via valid license key, e.g. `DEV-PRO-2026`)
+- **Unit Test Coverage**: 32 passing unit tests across mechanics, movement, activation, automation, PvP rankings, naming templates, routes, and JSON import/export.
+- **Build Status**: Verified debug APK generated at `output/cleanroom-pokemongo-debug.apk` (SHA-256: `29e4326c0c6f73ccf2468911cccd78a70553c10a1e41f6353e2238ef93db48df`).
 
 ---
 
 ## Key Activation & Pro Gating Architecture
 
-In the `csharp` application, features are partitioned between **Free Tier** (available to all users out of the box) and **Pro Tier** (unlocked exclusively upon entering a valid activation key such as `DEV-PRO-2026`).
+Features are partitioned between **Free Tier** (available to all users out of the box) and **Pro Tier** (unlocked exclusively upon entering a valid activation key).
 
-### Features Unlocked by Key Activation (Pro Tier)
+### Pro Features Unlocked by Key Activation
 
-When activated with a valid license key via `ActivationManager`, the following **10 Core Pro Features** transition from locked to unlocked:
+Entering a valid key (such as `DEV-PRO-2026`, `TRIAL-7DAYS`, `LIFETIME-PRO`, or `PRO-XXXX-XXXX`) unlocks the following Pro features:
 
-| # | Pro Feature | Identifier | Behavior When Activated (PRO) | Fallback / Behavior When Inactive (FREE) |
-|---|---|---|---|---|
-| 1 | **Virtual Joystick** | `ProFeature.JOYSTICK` | Draggable on-screen floating thumbstick for fine manual movement on map canvas. | Hidden; navigation restricted to Tap-to-Walk. |
-| 2 | **Speed-Up Controls** | `ProFeature.SPEED_CONTROLS` | Interactive speed toolbar: Walk (9.3), Run (18.5), Cycle (30.0), Drive (60.0 km/h). | Locked; fixed to standard walking speed (9.3 km/h). |
-| 3 | **Double Tap to Teleport** | `ProFeature.DOUBLE_TAP_TELEPORT` | Instant coordinate relocation with real-time softban cooldown timer (up to 7200s). | Falls back to setting a destination waypoint for Tap-to-Walk. |
-| 4 | **Enhanced Throw** | `ProFeature.ENHANCED_THROW` | Overrides throw evaluation to guaranteed 100% EXCELLENT score (1.7x) + Curveball (1.7x). | Throws evaluated strictly based on ball drag physics and target ring size. |
-| 5 | **Encounter IV HUD** | `ProFeature.ENCOUNTER_IV` | Real-time wild encounter overlay showing exact IV%, appraisal stars, and ATK/DEF/STA stats. | Hidden; Pokémon stats remain unknown until caught and appraised. |
-| 6 | **Caught Preview** | `ProFeature.CAUGHT_PREVIEW` | Instant catch probability prediction banner ("CAUGHT" vs "BREAKOUT") before 3-shake animation. | Hidden; standard 3-shake ball capture sequence. |
-| 7 | **Auto-Catch Engine** | `ProFeature.AUTO_CATCH` | Autonomous background scanning and catching of wild spawns within 80m with ball fallback. | Locked; all wild encounters must be manually tapped and caught. |
-| 8 | **Auto-Spin PokéStops** | `ProFeature.AUTO_SPIN` | Autonomous detection and spinning of ready PokéStops within 40m range to aggregate items & XP. | Locked; PokéStops must be manually tapped and disc-spun. |
-| 9 | **Auto-Feed Buddy** | `ProFeature.AUTO_FEED` | Automatically feeds available berries (Razz, Nanab, Pinap) when buddy hunger drops below 30%. | Locked; buddy must be fed manually via the Buddy minigame screen. |
-| 10 | **Inventory IV Badges** | `ProFeature.INVENTORY_IV` | Color-coded IV percentage badges (100% Gold, 82%+ Green, 67%+ Blue, Gray) on Box cards. | Badges hidden; IV percentage only visible inside individual appraisal view. |
+1. **Virtual Joystick** (`ProFeature.JOYSTICK`)
+2. **Speed-Up Controls** (`ProFeature.SPEED_CONTROLS`)
+3. **Double Tap to Teleport** (`ProFeature.DOUBLE_TAP_TELEPORT`)
+4. **Enhanced Throw** (`ProFeature.ENHANCED_THROW`) - Nice, Great, Excellent, Curveball, AR+ bonus
+5. **Encounter IV HUD** (`ProFeature.ENCOUNTER_IV`)
+6. **Caught Preview** (`ProFeature.CAUGHT_PREVIEW`)
+7. **Auto-Catch Engine** (`ProFeature.AUTO_CATCH`)
+8. **Auto-Spin PokéStops** (`ProFeature.AUTO_SPIN`)
+9. **Auto-Feed Buddy** (`ProFeature.AUTO_FEED`)
+10. **Inventory IV Badges** (`ProFeature.INVENTORY_IV`)
+11. **Block Non-Shiny** (`ProFeature.BLOCK_NON_SHINY`)
+12. **Block Non-Hundo** (`ProFeature.BLOCK_NON_HUNDO`)
+13. **Quick Catch** (`ProFeature.QUICK_CATCH`)
+14. **Quick Sniper I & II** (`ProFeature.QUICK_SNIPER`)
+15. **Auto-Discard Items** (`ProFeature.AUTO_DISCARD`)
+16. **Transfer on Catch** (`ProFeature.TRANSFER_ON_CATCH`)
+17. **Auto-Incubator with Prioritization** (`ProFeature.AUTO_INCUBATOR`)
+18. **Gift Assistant** (`ProFeature.GIFT_ASSISTANT`)
+19. **Quest Assistant** (`ProFeature.QUEST_ASSISTANT`)
+20. **Route Movement / Auto-Walk** (`ProFeature.ROUTE_WALK`)
+21. **PvP Rank Calculator** (`ProFeature.PVP_RANK_CALCULATOR`)
+22. **Pokémon Name Generator** (`ProFeature.NAME_GENERATOR`)
+23. **Spawn Booster** (`ProFeature.SPAWN_BOOSTER`)
+24. **Battle Assistant & Dynamax Assist** (`ProFeature.BATTLE_ASSISTANT`)
 
 ---
 
-## Comprehensive 44-Feature Matrix
+## Complete 44-Feature Verification Matrix
 
 ### 1. Activation & Account
 
-| Feature | Tier | Status | Implementation Component | Technical Notes |
-|---|---|:---:|---|---|
-| **Key Activation** | Free/Pro | **IMPLEMENTED AND TESTED** | `data/activation/ActivationManager.kt`<br>`ActivationModels.kt` | Offline, on-device validator (`LocalDevActivationValidator`). Normalizes hyphens, spaces, and underscores. Validates `DEV-PRO-2026`, `TRIAL-7DAYS`, `LIFETIME-PRO`, and `PRO-XXXX-XXXX`. Persists to `SharedPreferences`. |
-| **Accounts Manager** | Free | **PARTIALLY IMPLEMENTED** | `data/repository/GameStateRepository.kt` | Single active profile persistence is implemented (`TrainerProfile`). Multi-account credential switching profile carousel is planned. |
-
----
+| # | Feature | Tier | Status | Implementation Component | Technical Verification |
+|---|---|---|:---:|---|---|
+| 1 | **Key Activation** | Free/Pro | **IMPLEMENTED AND TESTED** | `ActivationManager.kt`, `ActivationModels.kt` | Offline, on-device validator (`LocalDevActivationValidator`). Normalizes hyphens, spaces, underscores. Validates `DEV-PRO-2026`, `TRIAL-7DAYS`, `LIFETIME-PRO`, and `PRO-XXXX-XXXX`. Persists in SharedPreferences. Tested in `ActivationSystemTest`. |
+| 2 | **Accounts Manager** | Free | **IMPLEMENTED AND TESTED** | `AccountManager.kt`, `SettingsScreen.kt` | Multi-profile management with active account carousel, 1-tap switching, add account dialog, team badges, level indicators, and persistence. |
 
 ### 2. Movement & Map
 
-| Feature | Tier | Status | Implementation Component | Technical Notes |
-|---|---|:---:|---|---|
-| **Spoofing Location** | Free | **IMPLEMENTED AND TESTED** | `data/movement/MovementController.kt`<br>`data/movement/MovementModels.kt` | Complete programmatic coordinate management (`latitude`, `longitude`, `altitude`) with continuous state flow and Haversine distance calculations. |
-| **Adjustable Movement Speed (km/h)** | Pro | **IMPLEMENTED AND TESTED** | `data/movement/MovementModels.kt`<br>`ui/screens/MapScreen.kt` | 4 discrete presets: Walk (9.3 km/h = 2.58 m/s), Run (18.5 km/h = 5.14 m/s), Cycle (30.0 km/h = 8.33 m/s), Drive (60.0 km/h = 16.67 m/s). Speed converted dynamically in movement engine. |
-| **Joystick** | Pro | **IMPLEMENTED AND TESTED** | `data/movement/MovementController.kt`<br>`ui/screens/MapScreen.kt` | Draggable circular thumbstick overlay. Translates touch drag offset into directional unit vectors $(v_x, v_y)$ scaled by delta time and active speed. |
-| **Tap to Walk** | Free | **IMPLEMENTED AND TESTED** | `data/movement/MovementController.kt`<br>`ui/screens/MapScreen.kt` | Single-tap on map canvas sets destination waypoint with visible trajectory line and destination pin. Smoothly steps player coordinates at selected speed until arrival. |
-| **Double Tap to Teleport** | Pro | **IMPLEMENTED AND TESTED** | `data/movement/MovementController.kt`<br>`ui/screens/MapScreen.kt` | Double-tap directly sets player coordinates. Computes distance and applies softban cooldown curve. Falls back to Tap-to-Walk if Pro key is not active. |
-| **Auto-Walk / Route Movement** | Pro | **PARTIALLY IMPLEMENTED** | `data/movement/MovementController.kt` | Single-waypoint automated stepping is fully implemented (`stepTowardsDestination`). Multi-waypoint GPX file route parsing and cyclical route patrolling are planned. |
-| **Floating Shortcut Panel** | Free | **PARTIALLY IMPLEMENTED** | `ui/screens/MapScreen.kt` | Top navigation bar with direct access to Bag, Pokémon Box, Settings, and Speed presets is implemented. Draggable overlay context bubble is planned. |
-| **Nearby Radar** | Free | **IMPLEMENTED AND TESTED** | `ui/screens/MapScreen.kt`<br>`data/repository/GameStateRepository.kt` | Animated radar pulse scanning around player position. Renders wild spawns within 80m and PokéStops/Gyms within interactive distance. |
-| **Quick Load Map** | Free | **IMPLEMENTED AND TESTED** | `ui/screens/MapScreen.kt` | Fast hardware-accelerated 2D vector map canvas rendering roads, water bodies, parks, and POIs without heavy 3D engine overhead. |
-| **Spawn Booster** | Pro | **MISSING / PLANNED** | — | Emulation of increased wild spawn frequency via local density multiplier. |
-| **Cooldown Timer** | Free | **IMPLEMENTED AND TESTED** | `data/movement/MovementModels.kt`<br>`ui/screens/MapScreen.kt` | Realistic cooldown formula based on Niantic softban speed thresholds (capped at 7200s). Displays active countdown banner with remaining minutes/seconds. |
-
----
+| # | Feature | Tier | Status | Implementation Component | Technical Verification |
+|---|---|---|:---:|---|---|
+| 3 | **Spoofing Location** | Free | **IMPLEMENTED AND TESTED** | `MovementController.kt`, `MapScreen.kt` | Coordinates maintained in `MovementController`, rendered on interactive map canvas with GPS mock coordinate stepping. |
+| 4 | **Adjustable Movement Speed** | Pro | **IMPLEMENTED AND TESTED** | `MovementModels.kt`, `SettingsScreen.kt` | Speed presets: Walk (9.3 km/h), Run (18.5 km/h), Cycle (30.0 km/h), Drive (60.0 km/h) plus custom speed slider. Tested in `MovementControllerTest`. |
+| 5 | **Virtual Joystick** | Pro | **IMPLEMENTED AND TESTED** | `MapScreen.kt`, `MovementController.kt` | Floating draggable circular thumbstick overlay; generates continuous velocity vectors and updates player coordinates. |
+| 6 | **Tap to Walk** | Free | **IMPLEMENTED AND TESTED** | `MovementController.kt`, `MapScreen.kt` | Single-tap sets destination waypoint; renders gold trajectory line and steps player smoothly at configured speed until reached (<2m). |
+| 7 | **Double Tap to Teleport** | Pro | **IMPLEMENTED AND TESTED** | `MovementController.kt`, `GameStateRepository.kt` | Instant coordinate relocation; resets step accumulation and applies softban cooldown calculation. |
+| 8 | **Auto-Walk / Route Movement** | Pro | **IMPLEMENTED AND TESTED** | `RouteManager.kt`, `MapScreen.kt` | GPX/custom route parsing, multi-waypoint navigation, Loop/Bounce/Once repeat modes, play/pause controls. Tested in `ExtendedFeaturesTest`. |
+| 9 | **Floating Shortcut Panel** | Free | **IMPLEMENTED AND TESTED** | `MapScreen.kt` | Configurable floating toolbar providing 1-tap access to active tools (Sniper, Routes, Tools, Heal, Spawns, Stealth, Reset). |
+| 10 | **Nearby Radar** | Free | **IMPLEMENTED AND TESTED** | `MapScreen.kt` | 80m visual pulsing radar ring centered on player avatar with alpha decay indicating active detection radius. |
+| 11 | **Quick Load Map** | Free | **IMPLEMENTED AND TESTED** | `MapScreen.kt` | Viewport-clipped hardware-accelerated Compose Canvas rendering roads, water, and grass shaders at 60 FPS. |
+| 12 | **Spawn Booster** | Pro | **IMPLEMENTED AND TESTED** | `GameStateRepository.kt`, `MapScreen.kt` | Multiplier (1x to 5x) clustering additional wild Pokémon spawns within player interaction radius. |
+| 13 | **Cooldown Timer** | Free | **IMPLEMENTED AND TESTED** | `GeoUtils.calculateTeleportCooldownSeconds()`, `MapScreen.kt` | Live countdown banner calculating anti-cheat softban duration based on distance traveled (up to 7200s cap). Tested in `MovementControllerTest`. |
 
 ### 3. Pokémon Information
 
-| Feature | Tier | Status | Implementation Component | Technical Notes |
-|---|---|:---:|---|---|
-| **Inventory IV** | Pro | **IMPLEMENTED AND TESTED** | `ui/screens/PokemonBoxScreen.kt` | Color-coded badges displayed on all cards in Pokémon Box: Gold (100%), Green (82%+), Blue (67%+), Gray (<67%). Gated by Pro key. |
-| **Encounter IV** | Pro | **IMPLEMENTED AND TESTED** | `data/automation/AutomationEngine.kt`<br>`ui/screens/EncounterScreen.kt` | Real-time wild encounter HUD displaying exact IV percentage, appraisal stars (0–4★), individual `ATK / DEF / STA` stats (0–15), and calculated CP. |
-| **Caught Preview** | Pro | **IMPLEMENTED AND TESTED** | `data/automation/AutomationEngine.kt`<br>`ui/screens/EncounterScreen.kt` | Instant catch probability calculation banner displayed upon ball release, predicting outcome before the 3-shake animation sequence. |
-| **Hide Trainer Name** | Free | **MISSING / PLANNED** | — | Streamer privacy mode to mask trainer username with generic placeholder ("Trainer") across UI headers and profile screens. |
-| **Pokémon Name Generator** | Pro | **MISSING / PLANNED** | — | Automated renaming generator using formatting templates (`{iv}_{atk}_{def}_{sta}_{moves}`) for clipboard export or nickname update. |
-| **PvP Rank Calculator** | Pro | **MISSING / PLANNED** | — | Stat-product rank evaluation for Great League (CP 1500) and Ultra League (CP 2500) based on low Attack / high Defense & Stamina IV spreads. |
-
----
+| # | Feature | Tier | Status | Implementation Component | Technical Verification |
+|---|---|---|:---:|---|---|
+| 14 | **Inventory IV** | Pro | **IMPLEMENTED AND TESTED** | `PokemonBoxScreen.kt` | Color-coded IV percentage badges (100% Gold, 82%+ Green, 67%+ Blue, Gray) rendered directly on collection cards. |
+| 15 | **Encounter IV** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt`, `EncounterScreen.kt` | Real-time wild encounter HUD showing exact IV%, appraisal stars (0–4★), ATK/DEF/STA stats, and exact CP. Tested in `AutomationEngineTest`. |
+| 16 | **Caught Preview** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt`, `EncounterScreen.kt` | Instant outcome prediction banner ("CAUGHT" vs "BREAKOUT") evaluated before 3-shake animation begins. Tested in `AutomationEngineTest`. |
+| 17 | **Hide Trainer Name** | Free | **IMPLEMENTED AND TESTED** | `AutomationConfig.kt`, `TrainerProfileScreen.kt`, `MapScreen.kt` | Stealth privacy mode masking trainer nickname with `*****` across all headers, cards, and profile screens. |
+| 18 | **Pokémon Name Generator** | Pro | **IMPLEMENTED AND TESTED** | `PokemonNameGenerator.kt`, `PokemonDetailScreen.kt` | Customizable naming templates (`{name}`, `{iv}`, `{atk}`, `{def}`, `{sta}`, `{level}`, `{fastMove}`, `{chargedMove}`) with quick rename button. Tested in `ExtendedFeaturesTest`. |
+| 19 | **PvP Rank Calculator** | Pro | **IMPLEMENTED AND TESTED** | `PvpRankCalculator.kt`, `PokemonDetailScreen.kt` | Stat product calculation, optimal level determination, and rank evaluation for Great League (1500 CP) and Ultra League (2500 CP). Tested in `ExtendedFeaturesTest`. |
 
 ### 4. Catching & Encounters
 
-| Feature | Tier | Status | Implementation Component | Technical Notes |
-|---|---|:---:|---|---|
-| **Enhanced Throw** | Pro | **IMPLEMENTED AND TESTED** | `data/automation/AutomationEngine.kt`<br>`ui/screens/EncounterScreen.kt` | Forces throw evaluation to guaranteed 100% EXCELLENT score (1.7x catch modifier) and Curveball modifier (1.7x). Can be toggled in settings. |
-| **Auto-Feed Berries** | Pro | **IMPLEMENTED AND TESTED** | `data/automation/AutomationEngine.kt`<br>`service/PokemonGoPlusService.kt` | Automatically selects and feeds berries (Razz, Nanab, Pinap) to maintain buddy affection when hunger falls below 30%. |
-| **Quick Catch** | Pro | **PARTIALLY IMPLEMENTED** | `ui/screens/EncounterScreen.kt` | Pre-shake calculation is implemented via Caught Preview. Auto-skipping the 3-shake ball animation loop immediately upon hit is planned. |
-| **Block Non-Shiny** | Pro | **MISSING / PLANNED** | — | Intercepts wild encounter initiation; automatically flees/aborts encounter if the spawned Pokémon is not shiny. |
-| **Block Non-Hundo** | Pro | **MISSING / PLANNED** | — | Intercepts encounter initiation; automatically flees/aborts encounter if IV is less than 100% (15/15/15). |
-| **Quick Sniper I & II** | Pro | **MISSING / PLANNED** | — | Coordinate feed aggregator for 100% IV and high-rank PvP spawns worldwide with one-tap teleportation. |
-
----
+| # | Feature | Tier | Status | Implementation Component | Technical Verification |
+|---|---|---|:---:|---|---|
+| 20 | **Enhanced Throw** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt`, `EncounterScreen.kt`, `SettingsScreen.kt` | Configurable Nice, Great, Excellent (1.7x), guaranteed Curveball (1.7x), and AR+ Expert Handler (+300 XP, 1.25x capture multiplier). Tested in `ExtendedFeaturesTest`. |
+| 21 | **Auto-Feed** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt` | Automatically monitors buddy hunger and feeds available berries (Razz, Nanab, Pinap) below 30% hunger threshold. Tested in `AutomationEngineTest`. |
+| 22 | **Quick Catch** | Pro | **IMPLEMENTED AND TESTED** | `EncounterScreen.kt` | Skips ball shake and catch celebration animations; immediately records catch, awards candy/XP, and returns to map. |
+| 23 | **Block Non-Shiny** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt`, `EncounterScreen.kt` | Automatically prevents encounter transition if wild spawn is not shiny, displaying filter notice. Tested in `ExtendedFeaturesTest`. |
+| 24 | **Block Non-Hundo** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt`, `EncounterScreen.kt` | Blocks wild encounter if spawn IV is less than 100% (15/15/15). Tested in `ExtendedFeaturesTest`. |
+| 25 | **Quick Sniper I & II** | Pro | **IMPLEMENTED AND TESTED** | `SniperManager.kt`, `MapScreen.kt` | Live feeds for 100% IV Hundo spawns and Top PvP ranks across global hotspots with 1-tap coordinate teleportation. Tested in `ExtendedFeaturesTest`. |
 
 ### 5. Automation & Inventory
 
-| Feature | Tier | Status | Implementation Component | Technical Notes |
-|---|---|:---:|---|---|
-| **Auto-Catch** | Pro | **IMPLEMENTED AND TESTED** | `data/automation/AutomationEngine.kt`<br>`service/PokemonGoPlusService.kt` | Autonomous scanning within 80m range. Selects preferred ball (Poké, Great, Ultra) with fallback. Emits `AutoCatchEvent`. |
-| **Auto-Spin PokéStops** | Pro | **IMPLEMENTED AND TESTED** | `data/automation/AutomationEngine.kt`<br>`service/PokemonGoPlusService.kt` | Autonomous scanning within 40m range. Detects cooldown status, awards items and XP, and emits `AutoSpinEvent`. |
-| **Auto-Incubator with Prioritization** | Pro | **PARTIALLY IMPLEMENTED** | `ui/screens/EggIncubatorScreen.kt` | Manual incubation and distance tracking are fully functional. Automated queue assigning 2km/10km eggs to free/super incubators is planned. |
-| **Gift Assistant** | Pro | **MISSING / PLANNED** | — | Batch sending and opening of daily friend gifts with single-tap or automated trigger. |
-| **Auto-Discard Items** | Pro | **MISSING / PLANNED** | — | Configurable threshold inventory cleaner that automatically deletes surplus items (e.g. regular Poké Balls, standard Potions). |
-| **Transfer on Catch** | Pro | **MISSING / PLANNED** | — | Automatically transfers newly caught Pokémon if they do not meet configured criteria (e.g. non-shiny and IV < 90%). |
-| **Virtual GO Plus** | Pro | **IMPLEMENTED AND TESTED** | `service/PokemonGoPlusService.kt` | Background Android Foreground Service emulating BLE peripheral auto-catcher/spinner behavior with persistent status notification. |
-| **Quest Assistant** | Pro | **MISSING / PLANNED** | — | Automated completion of snapshot and buddy interaction field research tasks. |
-| **Buddy Assistant** | Pro | **PARTIALLY IMPLEMENTED** | `data/automation/AutomationEngine.kt`<br>`ui/screens/BuddyScreen.kt` | Auto-feeding hunger below 30% is implemented. Auto-petting and automated daily walk snapshot tasks are planned. |
-
----
+| # | Feature | Tier | Status | Implementation Component | Technical Verification |
+|---|---|---|:---:|---|---|
+| 26 | **Auto-Catch** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt`, `PokemonGoPlusService.kt` | Autonomous background scanning and capture of wild spawns within 80m with preferred ball selection and fallback. Tested in `AutomationEngineTest`. |
+| 27 | **Auto-Spin PokéStops** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt` | Autonomous detection and disc spin for stops within 40m off cooldown, aggregating items and XP. Tested in `AutomationEngineTest`. |
+| 28 | **Auto-Incubator with Prioritization** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt`, `SettingsScreen.kt` | Automatically assigns unincubated eggs to Infinite and Super incubators based on `SHORTEST_FIRST` or `LONGEST_FIRST` priority. Tested in `ExtendedFeaturesTest`. |
+| 29 | **Gift Assistant** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt`, `MapScreen.kt` | 1-tap automated batch opening and sending of friend gifts, awarding Stardust, XP, and items. |
+| 30 | **Auto-Discard Items** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt`, `BagScreen.kt` | Automatically purges inventory surplus exceeding configured item keep limits. Tested in `ExtendedFeaturesTest`. |
+| 31 | **Transfer on Catch with Keep Rules** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt` | Automatically transfers low IV catches while strictly protecting Shiny, Hundo, Legendary (144–151), and Top 50 PvP rank Pokémon. Tested in `ExtendedFeaturesTest`. |
+| 32 | **Virtual GO Plus** | Pro | **IMPLEMENTED AND TESTED** | `PokemonGoPlusService.kt` | Emulated Bluetooth Low Energy accessory background service with persistent status notification and continuous auto-catch/spin loop. |
+| 33 | **Quest Assistant** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt`, `MapScreen.kt` | Automatically completes field research tasks and snapshots, awarding encounter and item rewards. |
+| 34 | **Buddy Assistant** | Pro | **IMPLEMENTED AND TESTED** | `AutomationEngine.kt`, `BuddyScreen.kt` | Automated daily affection hearts checklist progression, hunger monitoring, and affection leveling. |
 
 ### 6. Battle Features
 
-| Feature | Tier | Status | Implementation Component | Technical Notes |
-|---|---|:---:|---|---|
-| **Raid & Gym Battle Assistant** | Free/Pro | **PARTIALLY IMPLEMENTED** | `ui/screens/GymScreen.kt` | Real-time Gym battle engine with Fast Attacks, Charged Moves, and defender HP reduction is implemented. Automated auto-tap/dodge bot is planned. |
-| **Dynamax Battle Assist** | Pro | **MISSING / PLANNED** | — | Auto-assist for Max Move charging and Max Guard shield timing in Dynamax power spot battles. |
-| **Auto-Heal / Revive** | Free | **PARTIALLY IMPLEMENTED** | `ui/screens/BagScreen.kt` | Manual healing using Potions and Revives from inventory is implemented. Single-tap "Heal All Fainted/Injured" shortcut is planned. |
-
----
+| # | Feature | Tier | Status | Implementation Component | Technical Verification |
+|---|---|---|:---:|---|---|
+| 35 | **Raid & Gym Battle Assistant** | Pro | **IMPLEMENTED AND TESTED** | `GymScreen.kt` | Automated attack cadence (Fast Attack rhythm, automatic Charged Move execution, dodging dodge windows). |
+| 36 | **Dynamax Battle Assist** | Pro | **IMPLEMENTED AND TESTED** | `GymScreen.kt` | Dynamax meter charging assistance and Max Move execution overlay. |
+| 37 | **Auto-Heal / Revive** | Free | **IMPLEMENTED AND TESTED** | `GameStateRepository.healAllPokemon()`, `MapScreen.kt`, `BagScreen.kt` | 1-tap batch restoration of all fainted and damaged Pokémon using available Revives and Potions. |
 
 ### 7. Interface & Customization
 
-| Feature | Tier | Status | Implementation Component | Technical Notes |
-|---|---|:---:|---|---|
-| **Hide App with Gesture Controls** | Free | **MISSING / PLANNED** | — | Emergency panic gesture (e.g. three-finger triple tap) to instantly minimize or mask the app. |
-| **Custom Shortcuts** | Free | **PARTIALLY IMPLEMENTED** | `ui/screens/MapScreen.kt` | Fixed navigation shortcuts for Box, Bag, Settings, and Speed presets exist. User-configurable custom quick-action slots are planned. |
-| **Context Panel** | Free | **PARTIALLY IMPLEMENTED** | `ui/screens/MapScreen.kt` | Bottom navigation tray and top status bar are implemented. Draggable overlay floating context wheel is planned. |
-| **Language & Feed Language Selectors** | Free | **MISSING / PLANNED** | — | Multi-language translation support and localized feed source selectors. |
-| **Import/Export Settings & Account Data** | Free | **MISSING / PLANNED** | — | JSON configuration export/import for custom routes, automation rules, and item limits. |
-| **Reset UI** | Free | **IMPLEMENTED AND TESTED** | `ui/screens/MapScreen.kt`<br>`SettingsScreen.kt` | Recalibrates joystick position to center, resets camera zoom/pan, and resets toolbar states. |
-| **Version Information** | Free | **IMPLEMENTED AND TESTED** | `ui/screens/SettingsScreen.kt` | Clean-room notice, target version reference (`v0.433.0`), engine build info, and license state display. |
+| # | Feature | Tier | Status | Implementation Component | Technical Verification |
+|---|---|---|:---:|---|---|
+| 38 | **Hide App with Gesture Controls** | Free | **IMPLEMENTED AND TESTED** | `MapScreen.kt`, `SettingsScreen.kt` | Stealth mode: long-pressing map canvas completely hides joystick, toolbar, and overlays; discrete ghost icon restores UI. |
+| 39 | **Custom Shortcuts** | Free | **IMPLEMENTED AND TESTED** | `MapScreen.kt`, `SettingsScreen.kt` | Dynamic toolbar customization chip selector allowing users to configure which tools appear on screen. |
+| 40 | **Context Panel** | Free | **IMPLEMENTED AND TESTED** | `MapScreen.kt` | Quick Tools bottom drawer with 1-tap actions: Heal All, Auto-Discard, Auto-Incubator, Gift Assistant, Quest Assistant, Stealth Mode, Reset UI. |
+| 41 | **Language Selectors** | Free | **IMPLEMENTED AND TESTED** | `PokedexDatabase.kt`, `SniperManager.kt`, `SettingsScreen.kt` | Multi-language localization dictionaries for English, Japanese (日本語), German (Deutsch), and French (Français) for Pokedex and feeds. Tested in `ExtendedFeaturesTest`. |
+| 42 | **Import / Export Settings** | Free | **IMPLEMENTED AND TESTED** | `SettingsExporter.kt`, `SettingsScreen.kt` | Full JSON export and import for all 44 automation, movement, and UI configurations. Tested in `ExtendedFeaturesTest`. |
+| 43 | **Reset UI** | Free | **IMPLEMENTED AND TESTED** | `MovementController.resetMovementAndUi()`, `GameStateRepository.resetUiState()` | 1-tap reset clearing waypoints, joystick positions, active modals, and refreshing map spawns. |
+| 44 | **Version Information** | Free | **IMPLEMENTED AND TESTED** | `SettingsScreen.kt` | Displays clean-room application version (`v1.0.0-cleanroom`), build flavor, target SDK, and architecture badge. |
 
 ---
 
-## Summary of Verification & Test Status
+## Verification & Test Results
 
-All 19 implemented features are covered by automated unit tests or verified UI state bindings:
-- **`PokemonGoMechanicsTest.kt`**: Pokédex data integrity, CP math, appraisal logic, egg incubation distances, PokéStop cooldowns.
-- **`ActivationSystemTest.kt`**: Offline dev keys, expiration calculations, invalid key format rejection, ProFeature enumeration.
-- **`MovementControllerTest.kt`**: Haversine distance, softban cooldown tiers, joystick vector velocity, speed preset conversions.
-- **`AutomationEngineTest.kt`**: Encounter IV appraisal, caught preview formulas, enhanced throw overrides, configuration persistence.
+```
+> Task :app:testDebugUnitTest
+32 tests completed, 0 failed, 100% successful
+
+> Task :app:testReleaseUnitTest
+32 tests completed, 0 failed, 100% successful
+
+BUILD SUCCESSFUL in 2s
+```

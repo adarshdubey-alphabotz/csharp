@@ -126,8 +126,18 @@ class MovementController(
         _isWalking.value = false
     }
 
+    fun clearDestination() {
+        cancelTapToWalk()
+    }
+
     fun clearTeleportCooldown() {
         _teleportCooldown.value = null
+    }
+
+    fun resetMovementAndUi() {
+        cancelTapToWalk()
+        clearTeleportCooldown()
+        setSpeed(MovementSpeed.WALK)
     }
 
     companion object {

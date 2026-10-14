@@ -208,16 +208,17 @@ class GameStateRepository private constructor(private val context: Context) {
         )
     }
 
-    fun refreshWildSpawns() {
+    fun refreshWildSpawns(multiplier: Int = 1) {
         val lat = _playerLatitude.value
         val lon = _playerLongitude.value
         val random = Random()
 
+        val count = (5 * multiplier.coerceIn(1, 4)).coerceIn(5, 25)
         val spawns = mutableListOf<WildPokemonSpawn>()
-        for (i in 0 until 5) {
+        for (i in 0 until count) {
             val species = PokedexDatabase.getRandomSpawnSpecies()
-            val dLat = (random.nextDouble() - 0.5) * 0.0012
-            val dLon = (random.nextDouble() - 0.5) * 0.0012
+            val dLat = (random.nextDouble() - 0.5) * 0.0018
+            val dLon = (random.nextDouble() - 0.5) * 0.0018
             spawns.add(
                 WildPokemonSpawn(
                     speciesId = species.id,
@@ -229,6 +230,7 @@ class GameStateRepository private constructor(private val context: Context) {
         }
         _wildSpawns.value = spawns
     }
+
 
     fun updatePlayerLocation(lat: Double, lon: Double) {
         val oldLat = _playerLatitude.value
@@ -310,7 +312,8 @@ class GameStateRepository private constructor(private val context: Context) {
         ballType: ItemType,
         berry: ItemType?,
         throwQuality: ThrowQuality,
-        isCurveball: Boolean
+        isCurveball: Boolean,
+        isArPlus: Boolean = false
     ): CatchResult {
         val species = PokedexDatabase.getById(spawn.speciesId) ?: return CatchResult.Fled
         consumeItem(ballType, 1)
@@ -323,11 +326,12 @@ class GameStateRepository private constructor(private val context: Context) {
         val berryMultiplier = berry?.catchMultiplier ?: 1.0f
         val curveMultiplier = if (isCurveball) 1.7f else 1.0f
         val throwMultiplier = throwQuality.multiplier
+        val arMultiplier = if (isArPlus) 1.25f else 1.0f
 
         // Probability calculation
         val cpm = 0.45f
         val innerProb = (baseCaptureRate / (2.0f * cpm)).coerceIn(0.01f, 0.99f)
-        val totalMultiplier = (ballMultiplier * berryMultiplier * curveMultiplier * throwMultiplier).toDouble()
+        val totalMultiplier = (ballMultiplier * berryMultiplier * curveMultiplier * throwMultiplier * arMultiplier).toDouble()
         val catchChance = 1.0 - (1.0 - innerProb).pow(totalMultiplier)
 
         val roll = Random().nextDouble()
@@ -341,12 +345,14 @@ class GameStateRepository private constructor(private val context: Context) {
                 ivStamina = spawn.ivStamina,
                 fastMove = "Tackle",
                 chargedMove = "Special Attack",
-                currentHp = 100
+                currentHp = 100,
+                isShiny = spawn.isShiny
             )
             _pokemonBox.value = _pokemonBox.value + newPokemon
 
             // Rewards
-            val xpAward = 100 + throwQuality.xpBonus + (if (isCurveball) 10 else 0)
+            val arXp = if (isArPlus) 300 else 0
+            val xpAward = 100 + throwQuality.xpBonus + (if (isCurveball) 10 else 0) + arXp
             val stardustAward = 100
             val candyAward = if (berry == ItemType.PINAP_BERRY) 6 else 3
 
@@ -588,6 +594,63 @@ class GameStateRepository private constructor(private val context: Context) {
         return true
     }
 
+    fun healAllPokemon(): Int {
+        var restoredCount = 0
+        val itemsMap = _items.value.toMutableMap()
+        val updatedBox = _pokemonBox.value.map { pokemon ->
+            val species = PokedexDatabase.getById(pokemon.speciesId)
+            val maxHp = if (species != null) pokemon.calculateMaxHp(species) else 100
+
+            var hp = pokemon.currentHp
+
+            // Revive fainted Pokémon first
+            if (hp <= 0) {
+                if ((itemsMap[ItemType.MAX_REVIVE] ?: 0) > 0) {
+                    itemsMap[ItemType.MAX_REVIVE] = (itemsMap[ItemType.MAX_REVIVE] ?: 0) - 1
+                    hp = maxHp
+                    restoredCount++
+                } else if ((itemsMap[ItemType.REVIVE] ?: 0) > 0) {
+                    itemsMap[ItemType.REVIVE] = (itemsMap[ItemType.REVIVE] ?: 0) - 1
+                    hp = maxHp / 2
+                    restoredCount++
+                }
+            }
+
+            // Heal injured Pokémon
+            while (hp < maxHp) {
+                val potionType = when {
+                    (itemsMap[ItemType.MAX_POTION] ?: 0) > 0 -> ItemType.MAX_POTION
+                    (itemsMap[ItemType.HYPER_POTION] ?: 0) > 0 -> ItemType.HYPER_POTION
+                    (itemsMap[ItemType.SUPER_POTION] ?: 0) > 0 -> ItemType.SUPER_POTION
+                    (itemsMap[ItemType.POTION] ?: 0) > 0 -> ItemType.POTION
+                    else -> null
+                } ?: break
+
+                itemsMap[potionType] = (itemsMap[potionType] ?: 0) - 1
+                hp = (hp + potionType.healAmount).coerceAtMost(maxHp)
+                restoredCount++
+            }
+
+            pokemon.copy(currentHp = hp)
+        }
+
+        _items.value = itemsMap
+        _pokemonBox.value = updatedBox
+        saveState()
+        return restoredCount
+    }
+
+    fun renamePokemon(instanceId: String, newNickname: String): Boolean {
+        val updated = _pokemonBox.value.map {
+            if (it.id == instanceId) it.copy(nickname = newNickname.take(20)) else it
+        }
+        _pokemonBox.value = updated
+        saveState()
+        return true
+    }
+
+
+
     fun assignBuddy(instanceId: String) {
         _buddy.value = _buddy.value.copy(
             pokemonInstanceId = instanceId,
@@ -635,17 +698,25 @@ class GameStateRepository private constructor(private val context: Context) {
         _candies.value = current
     }
 
-    private fun addItem(itemType: ItemType, count: Int) {
+    fun addItem(itemType: ItemType, count: Int) {
         val current = _items.value.toMutableMap()
         current[itemType] = (current[itemType] ?: 0) + count
         _items.value = current
+        saveState()
     }
 
-    private fun consumeItem(itemType: ItemType, count: Int) {
+    fun consumeItem(itemType: ItemType, count: Int) {
         val current = _items.value.toMutableMap()
         val remaining = (current[itemType] ?: 0) - count
         current[itemType] = remaining.coerceAtLeast(0)
         _items.value = current
+        saveState()
+    }
+
+    fun addRewards(xp: Long, stardust: Int) {
+        _trainerProfile.value.addXp(xp)
+        _trainerProfile.value.stardust += stardust
+        saveState()
     }
 
     private fun saveState() {
@@ -730,6 +801,11 @@ class GameStateRepository private constructor(private val context: Context) {
                 e.printStackTrace()
             }
         }
+    }
+
+    fun resetUiState() {
+        refreshWildSpawns(1)
+        saveState()
     }
 
     companion object {

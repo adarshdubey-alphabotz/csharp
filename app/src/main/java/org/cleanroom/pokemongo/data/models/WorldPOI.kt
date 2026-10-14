@@ -46,5 +46,13 @@ data class WildPokemonSpawn(
     val ivAttack: Int = (0..15).random(),
     val ivDefense: Int = (0..15).random(),
     val ivStamina: Int = (0..15).random(),
+    val isShiny: Boolean = (1..50).random() == 1,
     val despawnTimestamp: Long = System.currentTimeMillis() + (15 * 60 * 1000L) // 15 mins
-)
+) {
+    val ivPercent: Float
+        get() = ((ivAttack + ivDefense + ivStamina) / 45.0f) * 100.0f
+
+    val isHundo: Boolean
+        get() = ivAttack == 15 && ivDefense == 15 && ivStamina == 15
+}
+

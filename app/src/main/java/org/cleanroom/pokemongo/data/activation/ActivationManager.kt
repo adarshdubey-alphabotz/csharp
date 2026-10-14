@@ -35,10 +35,15 @@ class LocalDevActivationValidator : ActivationValidator {
     }
 }
 
+interface ActivationFeatureChecker {
+    fun isFeatureUnlocked(feature: ProFeature): Boolean
+    fun isProActive(): Boolean
+}
+
 class ActivationManager(
     context: Context,
     private val validator: ActivationValidator = LocalDevActivationValidator()
-) {
+) : ActivationFeatureChecker {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("cleanroom_activation_prefs", Context.MODE_PRIVATE)
 
@@ -64,7 +69,7 @@ class ActivationManager(
         prefs.edit().clear().apply()
     }
 
-    fun isFeatureUnlocked(feature: ProFeature): Boolean {
+    override fun isFeatureUnlocked(feature: ProFeature): Boolean {
         val state = _activationState.value
         return when (state) {
             is ActivationState.Active -> !state.isExpired() && (state.tier == ActivationTier.PRO || feature.ordinal >= 0)
@@ -72,7 +77,7 @@ class ActivationManager(
         }
     }
 
-    fun isProActive(): Boolean {
+    override fun isProActive(): Boolean {
         val state = _activationState.value
         return state is ActivationState.Active && !state.isExpired()
     }
