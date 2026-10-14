@@ -149,6 +149,7 @@ Applying the architectural injection approach discovered in our REA analysis:
 - **Architecture**: 100% pure Kotlin and Jetpack Compose standalone application implementing all 44 features.
 
 ### 5.3 GitHub Repository
-- **Remote URL**: [`https://github.com/adarshdubey-alphabotz/csharp`](https://github.com/adarshdubey-alphabotz/csharp)
-- **Branch**: `main` (up to date with latest commits and documentation)
+- **Target Repository**: [`https://github.com/AkaneSakuramori/csharp`](https://github.com/AkaneSakuramori/csharp)
+- **Active Staging & Transfer Source**: [`https://github.com/adarshdubey-alphabotz/csharp`](https://github.com/adarshdubey-alphabotz/csharp) (Direct transfer to `AkaneSakuramori` initiated and collaborator invitation sent)
+- **Branch**: `main` (all commits and full codebase pushed)
 
