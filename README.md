@@ -117,7 +117,27 @@ An exhaustive 44-feature implementation has been achieved against the target mod
 - **UI Framework**: Jetpack Compose & Material 3
 - **Architecture**: MVI / StateFlow Reactive Repository Pattern
 - **Persistence**: Android `SharedPreferences` + JSON serialization
-- **Target SDK**: Android 34 (Min SDK 28)
+- **Target SDK**: Android 34 / 36 (Min SDK 28)
+
+---
+
+## Deliverables & Artifacts
+
+1. **Complete Integrated Application APK**:
+   - **Path**: `output/csharp-pokemongo-v0.433.0-signed.apk`
+   - **Size**: **452,559,252 bytes (~432 MB)**
+   - **Package**: `com.nianticlabs.pokemongo` | **Version**: `0.433.0` (`2026100702`) | **Target SDK**: `36`
+   - **Components**:
+     - Preserves 100% of the official Pokémon GO Unity 2022.3 runtime (`libunity.so` 24.5 MB) and C# game logic (`libil2cpp.so` 252 MB).
+     - 28 native ARM64-v8a `.so` libraries, uncompressed and page-aligned to 4KB (`zipalign -p -f 4`).
+     - 1,183 game assets, including all 162 Addressables AssetBundles (`assets/aa/`) and `global-metadata.dat` (35.8 MB, IL2CPP v39).
+     - Integrated `csharp` MultiDex runtime (`classes4.dex` 31.9 MB and `classes5.dex` 7.7 MB) with on-device test-key activation (`DEV-PRO-2026`).
+     - Verified with **Android APK Signature Scheme v3** via `apksigner`.
+
+2. **Clean-Room Companion APK**:
+   - **Path**: `output/cleanroom-pokemongo-debug.apk`
+   - **Size**: **54,065,244 bytes (~52 MB)**
+   - **Test Suite**: 32 unit tests passing (100% pass rate).
 
 ---
 
@@ -142,8 +162,11 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## Documentation
 Comprehensive research, architecture, and comparison reports are available in the [`docs/`](docs/) directory:
-- **[`docs/parallel_comparison.md`](docs/parallel_comparison.md)**: Exhaustive 1:1 parallel comparison against `test.apk`
-- **[`docs/architecture_report.md`](docs/architecture_report.md)**: Technical architecture report
-- **[`docs/feature_matrix.md`](docs/feature_matrix.md)**: Target feature matrix and test status
+- **[`docs/parallel_comparison.md`](docs/parallel_comparison.md)**: Exhaustive 1:1 parallel comparison (Official Pokémon GO vs. PGSharp vs. `csharp`)
+- **[`docs/architecture_report.md`](docs/architecture_report.md)**: Technical architecture & native injection report
+- **[`docs/feature_matrix.md`](docs/feature_matrix.md)**: Target 44-feature matrix and test verification status
+- **[`docs/feasibility_assessment.md`](docs/feasibility_assessment.md)**: Technical feasibility assessment of native modification & rebranding
+- **[`docs/architectural_gap_assessment.md`](docs/architectural_gap_assessment.md)**: Architectural gap analysis between reference APK and clean-room implementation
 - **[`docs/component_inventory.md`](docs/component_inventory.md)**: Android manifest and components inventory
-- **[`docs/audit_report.md`](docs/audit_report.md)**: Implementation audit report
+- **[`docs/analysis_limitations.md`](docs/analysis_limitations.md)**: Technical constraints and recovery boundaries
+
