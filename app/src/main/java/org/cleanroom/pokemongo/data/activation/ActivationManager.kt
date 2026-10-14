@@ -12,7 +12,7 @@ interface ActivationValidator {
 
 class LocalDevActivationValidator : ActivationValidator {
     override fun validateKey(key: String, currentTime: Long): Result<ActivationState.Active> {
-        val cleanKey = key.trim().uppercase()
+        val cleanKey = key.trim().uppercase().replace(Regex("[ _]+"), "-")
         return when {
             cleanKey.isEmpty() -> Result.failure(IllegalArgumentException("Activation key cannot be empty"))
             cleanKey == "DEV-PRO-2026" -> {

@@ -63,9 +63,15 @@ class ActivationSystemTest {
         val invalidRes = validator.validateKey("INVALID-KEY-123", now)
         assertTrue("Invalid key must fail", invalidRes.isFailure)
 
-        // Case insensitivity & trimming
+        // Case insensitivity, trimming, and space/underscore normalization
         val trimRes = validator.validateKey("   dev-pro-2026  ", now)
         assertTrue("Trimmed lowercase key should be accepted", trimRes.isSuccess)
+
+        val spaceRes = validator.validateKey("dev pro 2026", now)
+        assertTrue("Key with spaces should be normalized and accepted", spaceRes.isSuccess)
+
+        val underscoreRes = validator.validateKey("dev_pro_2026", now)
+        assertTrue("Key with underscores should be normalized and accepted", underscoreRes.isSuccess)
     }
 
     @Test
